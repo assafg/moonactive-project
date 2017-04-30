@@ -25,13 +25,19 @@ app.post('/echoAtTime', (req, res) => {
     message,
     timeUTC
   } = req.body;
+  if (!message || !timeUTC || typeof timeUTC !== 'number') {
+    return res.send(400, `Body should be of format: {
+    	"message": "[message to print to console]",
+    	"timeUTC": [TIMESTAMP (UTC) to print the message (Number)]
+    }`);
+  }
   const now = Date.now();
   schedule({
     id: uuid.v4(),
     message,
     timeUTC
   });
-  res.sendStatus(200).send();
+  res.sendStatus(200);
 })
 
 // catch 404 and forward to error handler
