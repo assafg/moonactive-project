@@ -1,4 +1,6 @@
 const KEY_PATTERN = /^scheduler__(.*)/;
+const SCHEDULER_PREFIX = 'scheduler__';
+const JOB_INFO_KEY = 'job_info';
 
 const handleMessage = (data) => {
   const { message } = data;
@@ -6,11 +8,11 @@ const handleMessage = (data) => {
 }
 
 const scheduleInRedis = redisClient => data => {
-  redisClient.set(`scheduler__${data.id}`, '', 'PX', data.timeUTC - Date.now(), (err) => {
+  redisClient.set(`${SCHEDULER_PREFIX}${data.id}`, '', 'PX', data.timeUTC - Date.now(), (err) => {
     if (err) {
       console.log('Error', err);
     }
-    redisClient.set(`job_info__${data.id}`, JSON.stringify(data))
+    redisClient.hset(JOB_INFO_KEY, data.id, JSON.stringify(data))
   });
 }
 
@@ -20,13 +22,13 @@ const onExpEvent = client => key => {
     return;
   }
 
-  client.get(`job_info__${match[1]}`, (err, data) => {
+  client.hget(JOB_INFO_KEY, match[1], (err, data) => {
     if (err) {
       console.log('Error', err);
       return;
     }
     if (data) {
-      client.del(`job_info__${match[1]}`, (err, resp) => {
+      client.hdel(JOB_INFO_KEY, match[1], (err, resp) => {
         if (err) {
           console.log('Error', err);
           return;
@@ -51,6 +53,11 @@ module.exports = (client, listener) => {
   });
 
   listener.subscribe('__keyevent@0__:expired');
+
+  // Check for expired task
+  client.hkeys(JOB_INFO_KEY, (err, keys) => {
+    keys.forEach(key => _onExpEvent(`${SCHEDULER_PREFIX}${key}`));
+  })
   // Init end
 
   return {
